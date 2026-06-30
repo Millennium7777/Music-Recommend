@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能音乐推荐系统</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 32px 24px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+        }
+        .header h1 { font-size: 2.2em; margin-bottom: 8px; letter-spacing: -0.5px; }
+        .header p { opacity: 0.9; font-size: 1.05em; }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            gap: 24px;
+        }
+        @media (max-width: 1200px) {
+            .container { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .panel h2 {
+            font-size: 1.1em;
+            color: var(--primary);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #eef2ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-list { max-height: 320px; overflow-y: auto; }
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 6px;
+        }
+        .user-item:hover { background: #f1f5f9; }
+        .user-item.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .user-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #c084fc, #6366f1);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 0.9em;
+            flex-shrink: 0;
+        }
+        .user-item.active .user-avatar { background: white; color: var(--primary); }
+        .user-name { font-weight: 600; font-size: 0.95em; }
+        .user-meta { font-size: 0.8em; opacity: 0.7; margin-top: 2px; }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+            border-radius: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .flow-step {
+            text-align: center;
+            padding: 16px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-width: 140px;
+            transition: transform 0.2s;
+        }
+        .flow-step:hover { transform: translateY(-3px); }
+        .flow-step .emoji { font-size: 1.8em; margin-bottom: 6px; display: block; }
+        .flow-step .label { font-weight: 700; color: var(--primary); font-size: 0.9em; }
+        .flow-step .desc { font-size: 0.75em; color: var(--text-light); margin-top: 4px; }
+        .flow-arrow { font-size: 1.5em; color: var(--primary); opacity: 0.5; }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .stat-card .num {
+            font-size: 1.8em;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+        .stat-card .lbl { font-size: 0.8em; color: var(--text-light); margin-top: 4px; }
+
+        .song-card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .song-card:hover {
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+            transform: translateY(-2px);
+            border-color: #c7d2fe;
+        }
+        .song-card::before {
+            content: "";
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--primary), var(--secondary));
+        }
+        .song-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .song-info h3 {
+            font-size: 1.15em;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .song-info .artist {
+            color: var(--text-light);
+            font-size: 0.9em;
+        }
+        .song-rank {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.85em;
+            flex-shrink: 0;
+        }
+        .song-tags {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            margin: 12px 0;
+        }
+        .tag {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .tag-genre { background: #dbeafe; color: #1e40af; }
+        .tag-emotion { background: #fce7f3; color: #9d174d; }
+        .tag-purpose { background: #fef3c7; color: #92400e; }
+        .tag-scene { background: #d1fae5; color: #065f46; }
+        .tag-time { background: #e0e7ff; color: #3730a3; }
+
+        .explanation {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        .explanation h4 {
+            font-size: 0.9em;
+            color: var(--primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .reason-list { list-style: none; }
+        .reason-list li {
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.88em;
+            color: #475569;
+        }
+        .reason-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .score-pill {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82em;
+            border: 1px solid #e2e8f0;
+        }
+        .score-pill .lbl { color: var(--text-light); }
+        .score-pill .val { font-weight: 700; color: var(--primary); }
+
+        .weight-panel .weight-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .weight-row:last-child { border-bottom: none; }
+        .weight-name { font-size: 0.85em; color: #475569; }
+        .weight-val {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85em;
+            min-width: 40px;
+            text-align: center;
+        }
+        .weight-val.changed {
+            background: #d1fae5;
+            color: #065f46;
+            animation: pulse 1s ease;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .profile-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .profile-item h4 {
+            font-size: 0.8em;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .profile-item .content {
+            font-size: 0.9em;
+            color: var(--text);
+            font-weight: 500;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            margin: 2px;
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .scene-select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 2px solid var(--border);
+            font-size: 0.95em;
+            margin-bottom: 12px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .scene-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        .btn-secondary:hover {
+            background: #eef2ff;
+        }
+
+        .loading-overlay {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.88em;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-song { font-weight: 500; }
+        .history-count {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .context-banner {
+            background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border: 1px solid #c7d2fe;
+        }
+        .context-icon { font-size: 2em; }
+        .context-text h4 { color: #1e40af; margin-bottom: 4px; }
+        .context-text p { color: #475569; font-size: 0.9em; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+        .empty-state .emoji { font-size: 3em; margin-bottom: 16px; }
+
+        .process-log {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82em;
+            line-height: 1.8;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .process-log .log-line { opacity: 0.8; }
+        .process-log .log-highlight { color: #34d399; font-weight: bold; }
+
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 10px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            color: var(--text-light);
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: var(--primary);
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .hidden { display: none !important; }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="header">
+        <h1>智能音乐推荐系统</h1>
+        <p>LightGCN 召回 → SASRec 精排 → 多维度动态加权推荐</p>
+    </div>
+
+    <div class="container">
+        <!-- 左侧面板 -->
+        <div class="left-col">
+            <div class="panel">
+                <h2><span>👤</span> 选择用户</h2>
+                <div class="user-list" id="userList">
+                    <div class="loading-overlay">
+                        <div class="spinner"></div>
+                        <div>加载用户列表...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2><span>🎭</span> 当前场景</h2>
+                <select class="scene-select" id="sceneSelect">
+                    <option value="运动">🏃 运动健身</option>
+                    <option value="学习">📚 专注学习</option>
+                    <option value="通勤">🚇 日常通勤</option>
+                    <option value="休息">☕ 休闲放松</option>
+                    <option value="聚会">🎉 朋友聚会</option>
+                    <option value="睡前">🌙 睡前助眠</option>
+                </select>
+                <button class="btn" onclick="updateScene()">🔄 更新场景</button>
+                <button class="btn btn-secondary" onclick="getRecommendations()">🎯 获取推荐</button>
+            </div>
+
+            <div class="panel">
+                <h2><span>📊</span> 用户画像</h2>
+                <div class="profile-grid" id="profileGrid">
+                    <div class="empty-state">
+                        <div class="emoji">🤔</div>
+                        <div>请先选择一位用户</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2><span>🎧</span> 最近收听</h2>
+                <div class="history-list" id="historyList">
+                    <div class="empty-state" style="padding: 20px;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">🎵</div>
+                        <div style="font-size: 0.9em;">暂无数据</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间主面板 -->
+        <div class="main-col">
+            <!-- 流程可视化 -->
+            <div class="flow-diagram" id="flowDiagram">
+                <div class="flow-step">
+                    <span class="emoji">🔍</span>
+                    <div class="label">LightGCN 召回</div>
+                    <div class="desc">从2000首歌曲中<br>筛选200首候选</div>
+                </div>
+                <div class="flow-arrow">➜</div>
+                <div class="flow-step">
+                    <span class="emoji">🧠</span>
+                    <div class="label">SASRec 精排</div>
+                    <div class="desc">基于序列行为<br>计算兴趣分数</div>
+                </div>
+                <div class="flow-arrow">➜</div>
+                <div class="flow-step">
+                    <span class="emoji">⚖️</span>
+                    <div class="label">多维度加权</div>
+                    <div class="desc">流派/情绪/场景<br/>动态权重融合</div>
+                </div>
+                <div class="flow-arrow">➜</div>
+                <div class="flow-step">
+                    <span class="emoji">✨</span>
+                    <div class="label">去重输出</div>
+                    <div class="desc">确保歌单无重复<br>生成最终推荐</div>
+                </div>
+            </div>
+
+            <!-- 统计栏 -->
+            <div class="stats-row" id="statsRow" style="display:none;">
+                <div class="stat-card">
+                    <div class="num" id="statRecall">200</div>
+                    <div class="lbl">召回候选</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num" id="statRank">200</div>
+                    <div class="lbl">精排序列</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num" id="statFinal">10</div>
+                    <div class="lbl">最终推荐</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num" id="statTime">0ms</div>
+                    <div class="lbl">响应时间</div>
+                </div>
+            </div>
+
+            <!-- 上下文横幅 -->
+            <div class="context-banner hidden" id="contextBanner">
+                <div class="context-icon" id="contextIcon">🎵</div>
+                <div class="context-text">
+                    <h4 id="contextTitle">当前场景</h4>
+                    <p id="contextDesc">推荐逻辑说明</p>
+                </div>
+            </div>
+
+            <!-- 处理日志 -->
+            <div class="process-log hidden" id="processLog"></div>
+
+            <!-- 推荐结果 -->
+            <div id="recommendationsArea">
+                <div class="empty-state">
+                    <div class="emoji">🎼</div>
+                    <h3 style="margin-bottom: 8px; color: var(--text);">欢迎使用智能音乐推荐</h3>
+                    <p>从左侧选择一位用户，点击「获取推荐」查看结果</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧面板 -->
+        <div class="right-col">
+            <div class="panel weight-panel">
+                <h2><span>⚖️</span> 动态权重</h2>
+                <div id="weightList">
+                    <div class="empty-state" style="padding: 20px;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">📊</div>
+                        <div style="font-size: 0.9em;">权重数据加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2><span>📝</span> 反馈模拟</h2>
+                <p style="font-size: 0.85em; color: var(--text-light); margin-bottom: 12px;">
+                    模拟用户行为，观察权重动态调整
+                </p>
+                <button class="btn" onclick="simulateFeedback('favorite')">❤️ 模拟收藏行为</button>
+                <button class="btn btn-secondary" onclick="simulateFeedback('play')">▶️ 模拟播放行为</button>
+            </div>
+
+            <div class="panel">
+                <h2><span>📈</span> 权重历史</h2>
+                <div id="weightHistory" style="font-size: 0.82em; color: var(--text-light); max-height: 200px; overflow-y: auto;">
+                    <div style="padding: 10px 0;">暂无权重调整记录</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        let currentUserId = null;
+        let currentScene = '休息';
+        let users = [];
+        let weights = {};
+        let recommendations = [];
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            loadWeights();
+        });
+
+        // ==================== API 调用 ====================
+        async function apiGet(path) {
+            const res = await fetch(path);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        }
+
+        async function apiPost(path, body) {
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        }
+
+        // ==================== 用户列表 ====================
+        async function loadUsers() {
+            try {
+                const data = await apiGet('/api/users');
+                users = data.users;
+                renderUserList();
+            } catch (e) {
+                document.getElementById('userList').innerHTML =
+                    `<div style="padding:20px;color:#ef4444;">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        function renderUserList() {
+            const container = document.getElementById('userList');
+            container.innerHTML = users.map(u => `
+                <div class="user-item ${u.id === currentUserId ? 'active' : ''}" data-id="${u.id}" onclick="selectUser(${u.id})">
+                    <div class="user-avatar">${u.name.charAt(0)}</div>
+                    <div>
+                        <div class="user-name">${u.name}</div>
+                        <div class="user-meta">用户 #${u.id}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function selectUser(userId) {
+            currentUserId = userId;
+            renderUserList();
+
+            // 加载用户画像
+            try {
+                const profile = await apiGet(`/api/users/${userId}/profile`);
+                renderProfile(profile);
+            } catch (e) { console.error(e); }
+
+            // 加载历史
+            try {
+                const history = await apiGet(`/api/users/${userId}/history?limit=10`);
+                renderHistory(history);
+            } catch (e) { console.error(e); }
+
+            // 更新场景选择器
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                document.getElementById('sceneSelect').value = user.current_scene || '休息';
+            }
+        }
+
+        // ==================== 渲染用户画像 ====================
+        function renderProfile(profile) {
+            const grid = document.getElementById('profileGrid');
+            const renderBadges = (arr) => arr.map(x => `<span class="badge">${x}</span>`).join('');
+
+            grid.innerHTML = `
+                <div class="profile-item">
+                    <h4>常听流派</h4>
+                    <div class="content">${renderBadges(profile.favorite_genres || [])}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>偏好情绪</h4>
+                    <div class="content">${renderBadges(profile.preferred_emotions || [])}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>常听主题</h4>
+                    <div class="content">${renderBadges(profile.preferred_purposes || [])}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>常听歌手</h4>
+                    <div class="content">${renderBadges((profile.favorite_artists || []).slice(0, 5))}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>活跃时段</h4>
+                    <div class="content">${renderBadges(profile.preferred_time_slots || [])}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>适用场景</h4>
+                    <div class="content">${renderBadges(profile.preferred_scenes || [])}</div>
+                </div>
+                <div class="profile-item">
+                    <h4>当前场景</h4>
+                    <div class="content" style="color: var(--primary); font-weight: 700;">
+                        ${profile.current_scene || '未知'} · ${profile.current_hour || '--'}:00
+                    </div>
+                </div>
+                <div class="profile-item">
+                    <h4>数据统计</h4>
+                    <div class="content">
+                        已听 ${profile.total_played || 0} 首 · 收藏 ${profile.total_favorited || 0} 首
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 渲染历史 ====================
+        function renderHistory(data) {
+            const container = document.getElementById('historyList');
+            if (!data.history || data.history.length === 0) {
+                container.innerHTML = `<div class="empty-state" style="padding:20px;"><div style="font-size:2em;margin-bottom:8px;">🎵</div><div style="font-size:0.9em;">暂无收听记录</div></div>`;
+                return;
+            }
+            container.innerHTML = data.history.map(h => `
+                <div class="history-item">
+                    <div>
+                        <div class="history-song">${h.song_name}</div>
+                        <div style="font-size:0.8em;color:var(--text-light);">${h.artist}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        ${h.is_favorited ? '<span style="color:#ec4899;">❤️</span>' : ''}
+                        <span class="history-count">${h.play_count}次</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ==================== 场景更新 ====================
+        async function updateScene() {
+            if (currentUserId === null) {
+                alert('请先选择一位用户');
+                return;
+            }
+            const scene = document.getElementById('sceneSelect').value;
+            try {
+                await apiPost(`/api/users/${currentUserId}/scene`, { scene });
+                currentScene = scene;
+                alert(`场景已更新为: ${scene}`);
+                // 刷新用户画像
+                const profile = await apiGet(`/api/users/${currentUserId}/profile`);
+                renderProfile(profile);
+            } catch (e) {
+                alert('更新失败: ' + e.message);
+            }
+        }
+
+        // ==================== 获取推荐 ====================
+        async function getRecommendations() {
+            if (currentUserId === null) {
+                alert('请先选择一位用户');
+                return;
+            }
+
+            const startTime = performance.now();
+            const area = document.getElementById('recommendationsArea');
+            const statsRow = document.getElementById('statsRow');
+            const contextBanner = document.getElementById('contextBanner');
+            const processLog = document.getElementById('processLog');
+
+            // 显示加载
+            area.innerHTML = `
+                <div class="loading-overlay">
+                    <div class="spinner"></div>
+                    <div>正在生成推荐...</div>
+                    <div style="font-size:0.85em;color:var(--text-light);margin-top:8px;">
+                        LightGCN召回 → SASRec精排 → 多维度加权 → 去重
+                    </div>
+                </div>
+            `;
+            statsRow.style.display = 'none';
+            contextBanner.classList.add('hidden');
+            processLog.classList.remove('hidden');
+            processLog.innerHTML = `<div class="log-line">[${new Date().toLocaleTimeString()}] 开始为用户 #${currentUserId} 生成推荐...</div>`;
+
+            try {
+                // 模拟步骤日志
+                await sleep(200);
+                processLog.innerHTML += `<div class="log-line">[${new Date().toLocaleTimeString()}] <span class="log-highlight">Step 1/4</span> LightGCN 召回: 从 2000 首歌曲中筛选候选集...</div>`;
+                await sleep(300);
+                processLog.innerHTML += `<div class="log-line">[${new Date().toLocaleTimeString()}] <span class="log-highlight">Step 2/4</span> SASRec 精排: 基于用户历史序列计算兴趣分数...</div>`;
+                await sleep(300);
+                processLog.innerHTML += `<div class="log-line">[${new Date().toLocaleTimeString()}] <span class="log-highlight">Step 3/4</span> 多维度加权: 融合流派/情绪/场景/歌手等标签...</div>`;
+                await sleep(200);
+                processLog.innerHTML += `<div class="log-line">[${new Date().toLocaleTimeString()}] <span class="log-highlight">Step 4/4</span> 去重校验: 确保最终歌单无重复内容...</div>`;
+
+                const data = await apiPost('/api/recommend', { user_id: currentUserId, top_n: 10 });
+                recommendations = data.recommendations || [];
+                const elapsed = Math.round(performance.now() - startTime);
+
+                // 显示统计
+                statsRow.style.display = 'grid';
+                document.getElementById('statRecall').textContent = '200';
+                document.getElementById('statRank').textContent = '200';
+                document.getElementById('statFinal').textContent = recommendations.length;
+                document.getElementById('statTime').textContent = elapsed + 'ms';
+
+                // 显示上下文
+                if (data.user_context) {
+                    contextBanner.classList.remove('hidden');
+                    const sceneEmoji = { '运动': '🏃', '学习': '📚', '通勤': '🚇', '休息': '☕', '聚会': '🎉', '睡前': '🌙' };
+                    document.getElementById('contextIcon').textContent = sceneEmoji[data.user_context.current_scene] || '🎵';
+                    document.getElementById('contextTitle').textContent = `当前场景: ${data.user_context.current_scene} · ${data.user_context.current_hour}:00`;
+                    document.getElementById('contextDesc').textContent = data.user_context.scene_description || '根据当前场景调整推荐策略';
+                }
+
+                // 显示权重
+                if (data.current_weights) {
+                    renderWeights(data.current_weights);
+                }
+
+                // 渲染推荐结果
+                renderRecommendations(data);
+
+                processLog.innerHTML += `<div class="log-line">[${new Date().toLocaleTimeString()}] <span class="log-highlight">✅ 推荐完成</span> 共生成 ${recommendations.length} 首推荐歌曲 (耗时 ${elapsed}ms)</div>`;
+
+            } catch (e) {
+                area.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">⚠️</div>
+                        <h3 style="margin-bottom:8px;">获取推荐失败</h3>
+                        <p style="color:#ef4444;">${e.message}</p>
+                    </div>
+                `;
+                processLog.innerHTML += `<div class="log-line" style="color:#f87171;">[${new Date().toLocaleTimeString()}] 错误: ${e.message}</div>`;
+            }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ==================== 渲染推荐结果 ====================
+        function renderRecommendations(data) {
+            const area = document.getElementById('recommendationsArea');
+            const recs = data.recommendations || [];
+
+            if (recs.length === 0) {
+                area.innerHTML = `<div class="empty-state"><div class="emoji">🤷</div><h3>暂无推荐</h3><p>该用户数据不足，无法生成推荐</p></div>`;
+                return;
+            }
+
+            area.innerHTML = recs.map((rec, idx) => {
+                const exp = rec.explanation || {};
+                const reasons = exp.reasons || [];
+                const activeTags = exp.active_tags || {};
+
+                return `
+                <div class="song-card">
+                    <div class="song-header">
+                        <div class="song-info">
+                            <h3>${rec.song_name}</h3>
+                            <div class="artist">${rec.artist}</div>
+                        </div>
+                        <div class="song-rank">${rec.rank}</div>
+                    </div>
+                    <div class="song-tags">
+                        <span class="tag tag-genre">${rec.genre}</span>
+                        <span class="tag tag-emotion">${rec.emotion}</span>
+                        <span class="tag tag-purpose">${rec.purpose}</span>
+                        ${activeTags.scene ? '<span class="tag tag-scene">场景匹配</span>' : ''}
+                        ${activeTags.time_slot ? '<span class="tag tag-time">时段匹配</span>' : ''}
+                    </div>
+                    <div class="explanation">
+                        <h4>🎯 推荐理由</h4>
+                        <ul class="reason-list">
+                            ${reasons.length > 0 ? reasons.map(r => `<li>${r}</li>`).join('') : '<li>基于协同过滤和序列模型综合推荐</li>'}
+                        </ul>
+                        <div class="score-grid">
+                            <div class="score-pill">
+                                <span class="lbl">SASRec精排分</span>
+                                <span class="val">${(exp.sasrec_score || 0).toFixed(3)}</span>
+                            </div>
+                            <div class="score-pill">
+                                <span class="lbl">特征加权分</span>
+                                <span class="val">${(exp.feature_score || 0).toFixed(3)}</span>
+                            </div>
+                            <div class="score-pill">
+                                <span class="lbl">最终综合分</span>
+                                <span class="val">${(exp.final_score || rec.score || 0).toFixed(3)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== 权重管理 ====================
+        async function loadWeights() {
+            try {
+                const data = await apiGet('/api/weights');
+                weights = data;
+                renderWeights(data);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderWeights(w) {
+            const container = document.getElementById('weightList');
+            const names = {
+                is_favorited: '是否收藏',
+                play_count: '听歌次数',
+                long_time_no_play: '长时间未听',
+                time_slot: '听歌时段',
+                scene: '当前场景',
+                dwell_time: '停留时长',
+                artist: '歌手偏好',
+                genre: '流派偏好',
+                emotion: '情绪匹配',
+                purpose: '创作目的'
+            };
+            container.innerHTML = Object.entries(w).map(([k, v]) => `
+                <div class="weight-row">
+                    <span class="weight-name">${names[k] || k}</span>
+                    <span class="weight-val" id="weight-${k}">${v.toFixed(1)}</span>
+                </div>
+            `).join('');
+        }
+
+        // ==================== 反馈模拟 ====================
+        async function simulateFeedback(type) {
+            if (currentUserId === null) {
+                alert('请先选择一位用户');
+                return;
+            }
+            if (!recommendations || recommendations.length === 0) {
+                alert('请先获取推荐结果');
+                return;
+            }
+
+            // 随机选择几首推荐歌曲作为反馈
+            const sampleSize = Math.min(3, recommendations.length);
+            const sampled = [...recommendations].sort(() => 0.5 - Math.random()).slice(0, sampleSize);
+            const itemIds = sampled.map(r => r.item_id);
+
+            const payload = {
+                user_id: currentUserId,
+                favorited: type === 'favorite' ? itemIds : [],
+                played: type === 'play' ? itemIds : [],
+                skipped: []
+            };
+
+            try {
+                const result = await apiPost('/api/feedback', payload);
+
+                // 高亮变化的权重
+                if (result.weight_updates && result.weight_updates.length > 0) {
+                    result.weight_updates.forEach(update => {
+                        // 解析更新信息，找到对应的DOM元素高亮
+                        const tagMap = {
+                            'is_favorited': 'weight-is_favorited',
+                            'play_count': 'weight-play_count'
+                        };
+                        // 简单匹配
+                        for (const [key, domId] of Object.entries(tagMap)) {
+                            if (update.includes(key) || update.includes('收藏') || update.includes('播放')) {
+                                const el = document.getElementById(domId);
+                                if (el) {
+                                    el.classList.add('changed');
+                                    setTimeout(() => el.classList.remove('changed'), 1500);
+                                }
+                            }
+                        }
+                    });
+
+                    // 添加到历史
+                    const histContainer = document.getElementById('weightHistory');
+                    const time = new Date().toLocaleTimeString();
+                    const action = type === 'favorite' ? '收藏' : '播放';
+                    const newEntry = document.createElement('div');
+                    newEntry.style.cssText = 'padding: 8px 0; border-bottom: 1px solid #f1f5f9;';
+                    newEntry.innerHTML = `
+                        <div style="color: var(--primary); font-weight: 600; font-size: 0.8em;">${time}</div>
+                        <div style="margin-top: 4px;">模拟${action}了 ${itemIds.length} 首歌</div>
+                        <div style="color: var(--success); font-size: 0.8em; margin-top: 2px;">
+                            ${result.weight_updates.join('; ')}
+                        </div>
+                    `;
+                    histContainer.insertBefore(newEntry, histContainer.firstChild);
+                }
+
+                // 刷新权重显示
+                if (result.current_weights) {
+                    renderWeights(result.current_weights);
+                }
+
+                alert(`已模拟${type === 'favorite' ? '收藏' : '播放'}行为，权重已动态调整！`);
+            } catch (e) {
+                alert('反馈提交失败: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
